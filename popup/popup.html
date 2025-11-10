@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>YoAvatar Depo</title>
+<link rel="stylesheet" href="popup.css" />
+</head>
+<body class="theme-default">
+  <header>
+    <nav class="tabs">
+      <button data-tab="upload" class="active">Upload</button>
+      <button data-tab="library">Library</button>
+      <button data-tab="settings">Settings</button>
+    </nav>
+  </header>
+  <main>
+    <section id="tab-upload" class="tab active" aria-label="Upload Avatar">
+      <h2>Upload Avatar</h2>
+      <div class="uploader" id="drop-zone">
+        <input type="file" id="file-input" accept="image/*" hidden />
+        <p id="drop-hint">Click / Drop / Paste Image</p>
+        <canvas id="preview" width="300" height="300" aria-label="Avatar Preview"></canvas>
+      </div>
+      <div class="field-row">
+        <label>Category
+          <select id="category-select"></select>
+        </label>
+        <button id="add-category" class="small">+ New</button>
+      </div>
+      <div class="field-row" id="new-cat-row" style="display:none;">
+        <input type="text" id="new-category-name" placeholder="Category name" />
+        <button id="save-new-category" class="small">Save</button>
+        <button id="cancel-new-category" class="small ghost">Cancel</button>
+      </div>
+      <div class="actions">
+        <button id="btn-upload" disabled>Upload</button>
+        <button id="btn-replace" disabled>Replace</button>
+        <button id="btn-delete" disabled>Delete</button>
+        <button id="btn-copy-link" disabled>Copy Link</button>
+      </div>
+      <div id="upload-status" class="status"></div>
+    </section>
+
+    <section id="tab-library" class="tab" aria-label="Avatar Library">
+      <h2>Library</h2>
+      <div class="filters">
+        <select id="filter-category"></select>
+        <button id="refresh-library" class="small">Refresh</button>
+      </div>
+      <div id="library-grid" class="grid" aria-live="polite"></div>
+      <div id="library-status" class="status"></div>
+    </section>
+
+    <section id="tab-settings" class="tab" aria-label="Settings & Themes">
+      <h2>Settings</h2>
+      <div class="settings-group">
+        <label>ImgBB API Key
+          <input type="password" id="api-key" placeholder="Enter key" />
+        </label>
+        <button id="save-key" class="small">Save Key</button>
+        <span id="key-status" class="status"></span>
+      </div>
+      <div class="settings-group">
+        <label>Theme
+          <select id="theme-select">
+            <option value="default">Default</option>
+            <option value="dark">Dark</option>
+            <option value="violet">Violet</option>
+            <option value="emerald">Emerald</option>
+          </select>
+        </label>
+      </div>
+      <div class="settings-group">
+        <button id="export-data" class="small">Export Data</button>
+        <button id="import-data" class="small">Import Data</button>
+        <input type="file" id="import-file" accept="application/json" hidden />
+      </div>
+      <footer>
+        <a href="https://buymeacoffee.com/" target="_blank" rel="noopener">Buy Me a Coffee</a>
+        <span class="app-version" id="app-version"></span>
+      </footer>
+    </section>
+  </main>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+<script src="popup.js" type="module"></script>
+</body>
+</html>

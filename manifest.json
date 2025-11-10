@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "YoAvatar Depo",
+  "version": "0.1.0",
+  "description": "Upload, categorize, and share YoWorld avatar images with forum-ready links.",
+  "permissions": ["storage", "tabs"],
+  "host_permissions": ["https://api.imgbb.com/*"],
+  "action": { "default_popup": "popup/popup.html", "default_title": "YoAvatar Depo" },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "options_page": "options/options.html",
+  "background": { "service_worker": "background.js" }
+}

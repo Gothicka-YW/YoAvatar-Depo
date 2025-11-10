@@ -1,0 +1,17 @@
+YoAvatar Depo - Install Instructions (Prototype)
+
+1. Get an ImgBB API key (https://api.imgbb.com/). Log in, copy your key.
+2. In Chrome/Edge, open chrome://extensions (edge://extensions).
+3. Toggle Developer Mode (top right).
+4. Click "Load unpacked" and choose the YoAvatar-Depo folder.
+5. Open the extension popup; go to Settings tab, paste your API key, Save Key.
+6. Upload tab: click or drop an image; choose / create a category; Upload.
+7. After upload, click Copy Link to get forum-ready BBCode.
+
+Troubleshooting:
+- If uploads fail, open the popup DevTools (right-click popup → Inspect) and check console for network errors.
+- Ensure key is valid and not rate-limited.
+- Some large images may take longer to encode; keep popup open until status shows Uploaded.
+
+Data:
+- Avatars metadata currently stored locally (no cloud sync). Use Export in Settings for backup.
