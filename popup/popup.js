@@ -5,19 +5,33 @@ import { makeForumLink } from '../src/lib/forum.js';
 
 const tabs = document.querySelectorAll('nav.tabs button');
 const tabSections = document.querySelectorAll('.tab');
-let currentId = null; // selected avatar id in upload tab
+let currentId = null; // selected avatar id in upload tab (persisted)
+const SELECTED_KEY = 'yad:selectedId';
+const FILTER_KEY = 'yad:filterCat';
+const SCROLL_KEY_PREFIX = 'yad:scroll:'; // per-tab scroll positions
+const PREVIEW_KEY = 'yad:previewDataUrl';
+const UPLOAD_CAT_KEY = 'yad:lastUploadCat';
 
 function switchTab(id){
+  // Save scroll position of currently active tab before switching
+  const active = document.querySelector('.tab.active');
+  if(active){
+    const sc = active.scrollTop;
+    localStorage.setItem(SCROLL_KEY_PREFIX + active.id.replace('tab-',''), String(sc));
+  }
   tabs.forEach(b=> b.classList.toggle('active', b.dataset.tab === id));
   tabSections.forEach(s=> s.classList.toggle('active', s.id === 'tab-'+id));
   localStorage.setItem('yad:lastTab', id);
   if(id==='library') renderLibrary();
   if(id==='settings') loadSettingsUI();
+  // Restore scroll position for new tab
+  const target = document.getElementById('tab-'+id);
+  if(target){
+    const saved = localStorage.getItem(SCROLL_KEY_PREFIX + id);
+    if(saved){ target.scrollTop = parseInt(saved,10)||0; }
+  }
 }
-const last = localStorage.getItem('yad:lastTab');
-if(last) switchTab(last); else switchTab('upload');
-
-tabs.forEach(b=> b.addEventListener('click', ()=> switchTab(b.dataset.tab)));
+// We'll attach tab click handlers after elements are initialized below
 
 // Elements
 const drop = document.getElementById('drop-zone');
@@ -67,6 +81,7 @@ function setStatus(msg, color){
 function resetPreview(){
   ctx.clearRect(0,0,previewCanvas.width, previewCanvas.height);
   currentImageData = null; uploadBtn.disabled = true; replaceBtn.disabled = true; deleteBtn.disabled = !currentId; copyBtn.disabled = !currentId;
+  localStorage.removeItem(PREVIEW_KEY);
 }
 
 function drawPreview(img){
@@ -79,6 +94,11 @@ function drawPreview(img){
   // store ImageData
   const off = document.createElement('canvas'); off.width = img.width; off.height = img.height; off.getContext('2d').drawImage(img,0,0);
   currentImageData = off.getContext('2d').getImageData(0,0,off.width,off.height);
+  // Persist preview (DataURL, may be large; acceptable for small avatars)
+  try {
+    const dataURL = off.toDataURL('image/png');
+    localStorage.setItem(PREVIEW_KEY, dataURL);
+  } catch(e){}
   uploadBtn.disabled = false; replaceBtn.disabled = !currentId; deleteBtn.disabled = !currentId; copyBtn.disabled = !currentId;
 }
 
@@ -97,14 +117,32 @@ async function populateCategorySelect(){
   cats.forEach(c=>{
     const opt = document.createElement('option'); opt.value = c; opt.textContent = c; catSelect.appendChild(opt);
   });
+  // Restore last selected upload category
+  const lastCat = localStorage.getItem(UPLOAD_CAT_KEY);
+  if(lastCat && cats.includes(lastCat)){
+    catSelect.value = lastCat;
+  } else if(cats.includes('Default')){
+    catSelect.value = 'Default';
+  }
 }
 
 addCatBtn.addEventListener('click', ()=>{ newCatRow.style.display='flex'; newCatName.value=''; newCatName.focus(); });
-cancelNewCat.addEventListener('click', ()=>{ newCatRow.style.display='none'; });
+cancelNewCat.addEventListener('click', ()=>{ newCatRow.style.display='none'; localStorage.removeItem('yad:draftCat'); localStorage.removeItem('yad:draftCatVisible'); });
+// Persist draft category name as user types
+newCatName.addEventListener('input', ()=>{
+  const val = newCatName.value; if(val) localStorage.setItem('yad:draftCat', val); else localStorage.removeItem('yad:draftCat');
+});
 saveNewCat.addEventListener('click', async ()=>{
   const name = newCatName.value.trim(); if(!name) return; const s = await getSettings();
   if(!s.categories) s.categories=[]; if(!s.categories.includes(name)){ s.categories.push(name); await setSettings({ categories: s.categories }); }
-  newCatRow.style.display='none'; populateCategorySelect(); catSelect.value = name; showToast('Category added');
+  newCatRow.style.display='none'; populateCategorySelect(); catSelect.value = name; localStorage.setItem(UPLOAD_CAT_KEY, name); showToast('Category added');
+  localStorage.removeItem('yad:draftCat'); localStorage.removeItem('yad:draftCatVisible');
+});
+// Pressing Enter in the new category input saves it
+newCatName.addEventListener('keydown', (e)=>{
+  if(e.key === 'Enter'){
+    e.preventDefault(); saveNewCat.click();
+  }
 });
 
 // Drag/drop/paste
@@ -112,6 +150,11 @@ function handleFile(file){
   const url = URL.createObjectURL(file);
   const img = new Image(); img.onload = ()=>{ drawPreview(img); URL.revokeObjectURL(url); }; img.src = url;
 }
+
+// Persist upload category selection
+catSelect.addEventListener('change', ()=>{
+  localStorage.setItem(UPLOAD_CAT_KEY, catSelect.value || 'Default');
+});
 
 drop.addEventListener('click', ()=> fileInput.click());
 drop.addEventListener('dragover', e=>{ e.preventDefault(); drop.classList.add('drag'); });
@@ -157,6 +200,10 @@ function imageDataToPngBlob(imageData){
 
 async function renderLibrary(){
   libGrid.innerHTML='';
+  buildFilterCategories();
+  // Apply saved filter before building
+  const savedFilter = localStorage.getItem(FILTER_KEY);
+  if(savedFilter){ filterCategory.value = savedFilter; }
   const all = db.all();
   const filter = filterCategory.value || 'ALL';
   const filtered = all.filter(r=> filter==='ALL' || r.category===filter);
@@ -172,7 +219,11 @@ async function renderLibrary(){
     card.addEventListener('click', ()=> selectRecord(rec.id));
     libGrid.appendChild(card);
   });
-  buildFilterCategories();
+  // Reapply selection highlight if currentId is set
+  // Reapply selection highlight if currentId is set
+  if(currentId){
+    [...libGrid.querySelectorAll('.card')].forEach(card=> card.classList.toggle('selected', card.dataset.id == currentId));
+  }
 }
 
 function buildFilterCategories(){
@@ -182,16 +233,26 @@ function buildFilterCategories(){
   cats.forEach(c=>{ const o=document.createElement('option'); o.value=c; o.textContent=c; filterCategory.appendChild(o); });
 }
 
-filterCategory.addEventListener('change', renderLibrary);
+filterCategory.addEventListener('change', ()=>{
+  localStorage.setItem(FILTER_KEY, filterCategory.value || 'ALL');
+  renderLibrary();
+});
 refreshLibBtn.addEventListener('click', renderLibrary);
 
 function selectRecord(id){
   const rec = db.get(id); if(!rec) return;
-  currentId = id; deleteBtn.disabled=false; replaceBtn.disabled= !currentImageData; copyBtn.disabled=false;
+  currentId = id; localStorage.setItem(SELECTED_KEY, String(id));
+  deleteBtn.disabled=false; replaceBtn.disabled= !currentImageData; copyBtn.disabled=false;
   // highlight in grid
   [...libGrid.querySelectorAll('.card')].forEach(card=> card.classList.toggle('selected', card.dataset.id == id));
   // load its image into preview (for replace convenience)
   const img = new Image(); img.onload=()=> drawPreview(img); img.crossOrigin='anonymous'; img.src = rec.url;
+  // Show forum link in a toast for quick copy reference
+  if(rec.forum){
+    showToast('Forum link ready (tap Copy Link)');
+    // Also display the forum link in library status area
+    libStatus.textContent = rec.forum;
+  }
   setStatus('Selected avatar.');
 }
 
@@ -251,5 +312,52 @@ chrome.runtime.sendMessage({ type:'PING' }, res=>{ console.log('Background pong:
 
 // Initialize
 (async function init(){
-  await populateCategorySelect(); await renderLibrary(); loadSettingsUI();
+  // Wire up tab switching handlers now that elements exist
+  tabs.forEach(b=> b.addEventListener('click', ()=> switchTab(b.dataset.tab)));
+  const last = localStorage.getItem('yad:lastTab');
+  if(last) switchTab(last); else switchTab('upload');
+
+  await populateCategorySelect();
+  await renderLibrary();
+  loadSettingsUI();
+  // Restore draft category if present
+  const draftVisible = localStorage.getItem('yad:draftCatVisible');
+  const draftName = localStorage.getItem('yad:draftCat');
+  if(draftVisible){ newCatRow.style.display='flex'; if(draftName){ newCatName.value = draftName; } }
+  // Restore filter selection (already applied in renderLibrary after categories) ensure UI value matches
+  const savedFilter = localStorage.getItem(FILTER_KEY); if(savedFilter){ filterCategory.value = savedFilter; }
+  // Restore selected avatar
+  const savedSelected = localStorage.getItem(SELECTED_KEY); if(savedSelected){
+    const rec = db.get(parseInt(savedSelected,10)); if(rec){ selectRecord(rec.id); }
+  }
+  // Restore preview image if present and not replaced yet
+  const prevDataUrl = localStorage.getItem(PREVIEW_KEY);
+  if(prevDataUrl && !currentImageData){
+    const img = new Image(); img.onload=()=> drawPreview(img); img.src = prevDataUrl;
+  }
+  // Restore scroll position for initial tab
+  const lastTab = localStorage.getItem('yad:lastTab');
+  if(lastTab){
+    const sc = localStorage.getItem(SCROLL_KEY_PREFIX + lastTab);
+    if(sc){ const target = document.getElementById('tab-'+lastTab); if(target){ target.scrollTop = parseInt(sc,10)||0; } }
+  }
 })();
+
+// Continuously persist scroll positions while user scrolls (debounced)
+const scrollTimers = {};
+tabSections.forEach(sec=>{
+  sec.addEventListener('scroll', ()=>{
+    const id = sec.id.replace('tab-','');
+    clearTimeout(scrollTimers[id]);
+    scrollTimers[id] = setTimeout(()=>{
+      localStorage.setItem(SCROLL_KEY_PREFIX + id, String(sec.scrollTop));
+    }, 150);
+  }, { passive: true });
+});
+
+// Track visibility state of draft row
+const observer = new MutationObserver(()=>{
+  const visible = newCatRow.style.display !== 'none';
+  if(visible) localStorage.setItem('yad:draftCatVisible', '1'); else localStorage.removeItem('yad:draftCatVisible');
+});
+observer.observe(newCatRow, { attributes:true, attributeFilter:['style'] });
